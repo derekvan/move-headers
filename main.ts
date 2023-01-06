@@ -2,7 +2,7 @@ import { App, Editor, MarkdownView, Plugin, SuggestModal } from 'obsidian';
 
 function getHeadings(): any[] {
 	const { metadataCache } = this.app
-	const workspace = this. app.workspace
+	const workspace = this.app.workspace
 	const fileTitle = workspace.getActiveFile();
 	let headings: any[]
 	if (fileTitle == null) {
@@ -76,60 +76,72 @@ class HeaderModal extends SuggestModal<string> {
 				if (!view) return []
 				const editor = view.editor
 				const doc = view.getViewData();
-				const headings = getHeadings();
 				let content = "";
 				const isSelection = editor.somethingSelected();
 				const selection = editor.getSelection();
-				const line = editor.getLine(editor.getCursor().line);
-
+				const lineNumber = editor.getCursor().line
+				const line = editor.getLine(lineNumber);
+				let oldText = ""
 				// get the selection or line
-
+				
 				if (isSelection) {
 					content = selection;
+					oldText = doc.replace(content,"");
+					//TODO:: how to say how many lines were pulled here, to reset the line positions below?
 				} 
 				else {
 					content = line;
+					editor.replaceRange("",{"line":lineNumber,"ch":0},{"line":lineNumber,"ch":Infinity})
+					oldText = view.getViewData();
 				}
+				console.log("oldtext = \n" + oldText)
 				let position: string | any[] = []
 				let existing = ""
 				let isLast = false;
-
-				// Get the existing content of the heading before adding the selected line 
-
+				let isFinal = false
+				
+				// Loop through the headings array and find the selected heading
+				const headings = getHeadings();
 				for (let i = 0; i < headings.length; i++) { 
 					const heading = headings[i];
+					// Once the selected heading is found, determine if the heading is the last heading or not
 					if (heading.heading == header) { 
-						if (i == headings.length - 1) { 
+						if (i == headings.length - 1) { // it's the last heading, so the position is the start of that heading and -1
 							position = [heading.position.start.line, -1];
+							if (choice == "append"){ //Since we're appending, set the boolean so we add to the end of document instead
+								isFinal = true
+							}
 						} 
-						else { 
-							position = [heading.position.start.line, headings[i + 1].position.start.line]; 
+						else {  // it's not the last heading so the position is the start and end of the selected heading
+							position = [heading.position.start.line, headings[i+1].position.start.line]; 
+							console.log("position " + position)
 						} 
-						if (heading.position.start.line == editor.lastLine()){
+						if (heading.position.start.line == editor.lastLine()){ // If the last heading is on the last line of the document, this is a special condition and needs to be addressed differently
 							isLast = true
 							console.log("isLast is true")
-						}
+						}						
 					} 
 				} 
 				if (position) {
-					let newText = ""
-					const oldText = doc.replace(content,"");
-					if (isLast == false){ 
-						existing = doc.split("\n").slice(position[0], position[1]).join("\n");
-						const matchHeader = existing.match(/#.*/)
-						if (!matchHeader) return[]
-						const matchBody = existing.replace(/#.*/,"").trimStart();			
+					if (isLast == false){ // Since the heading isn't on the last line, perform normal replace actions
+						existing = oldText.split("\n").slice(position[0], position[1]).join("\n");
+						console.log(existing)
+						const matchHeader = editor.getLine(position[0])
 							if(choice == "prepend"){
-								newText	= oldText.replace(existing,matchHeader[0] + "\n\n" + content + "\n" + matchBody);
+								editor.replaceRange(`${matchHeader}\n\n${content.trimEnd()}`,{"line":position[0],"ch":0},{"line":position[0],"ch":Infinity})
 							}
 							
 							if(choice == "append"){
-								console.log(`existing = ${existing} and content = ${content}`)
-								newText = oldText.replace(existing,existing + "\n" + content);
+								if (isFinal == false){ // Since it's not the final, replace the whole block
+									editor.replaceRange(`${existing}\n${content.trimEnd()}`,{"line":position[0],"ch":0},{"line":(position[1])-1,"ch":Infinity})
+								}
+								if (isFinal == true){ // Since it's the last header, just add a line at the end of the document
+									view.setViewData(oldText + "\n\n" + content,false)
+								}
 							}
-						view.setViewData(newText, false)
+						
 					}
-					else {
+					else { // Since the heading is on the last line, we can just add the new content to the end of the document
 						view.setViewData(oldText + "\n\n" + content,false)
 					}			
 			}

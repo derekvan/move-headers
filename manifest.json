@@ -1,7 +1,7 @@
 {
 	"id": "move-headers",
 	"name": "Move text to header",
-	"version": "1.0.0",
+	"version": "1.5.0",
 	"minAppVersion": "0.15.0",
 	"description": "Move selected text or current line to an existing Markdown header in the document, either prepend it or append it to the section.",
 	"author": "Derek Van Ittersum",
